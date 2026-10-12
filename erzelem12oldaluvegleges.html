@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>12 oldalú érzelemkocka</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --text: #261f19;
+      --radius: 1.5rem;
+      --poly-size: min(72vw, 420px);
+      --duration: 7.5s;
+      --easing: cubic-bezier(0.14, 0.86, 0.22, 1);
+      --tilt-x: -10deg;
+      --tilt-y: 24deg;
+      --font-body: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      --font-display: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+      --translate-z: calc(var(--poly-size) * 0.66);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-height: 100dvh;
+      font-family: var(--font-body);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255, 179, 92, 0.24), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(1, 105, 111, 0.14), transparent 24%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    .scene {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      place-items: center;
+      perspective: 1800px;
+    }
+
+    .polyhedron {
+      position: relative;
+      width: var(--poly-size);
+      height: var(--poly-size);
+      transform-style: preserve-3d;
+      transition: transform var(--duration) var(--easing);
+      transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    }
+
+    .face {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 220px;
+      height: 220px;
+      margin: -110px;
+      clip-path: polygon(50% 0%, 100% 35%, 85% 100%, 15% 100%, 0% 35%);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 0.5rem;
+      color: white;
+      font-family: var(--font-display);
+      font-size: clamp(1.15rem, 0.85rem + 1.2vw, 1.65rem);
+      line-height: 1.05;
+      letter-spacing: 0.02em;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      border: 2px solid rgba(255,255,255,0.28);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 10px 22px rgba(31, 22, 16, 0.18);
+      backface-visibility: hidden;
+      user-select: none;
+    }
+
+    .shadow {
+      position: absolute;
+      bottom: 12%;
+      width: min(48vw, 260px);
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(20, 16, 12, 0.24), rgba(20, 16, 12, 0.06) 55%, transparent 74%);
+      filter: blur(8px);
+      pointer-events: none;
+    }
+
+    .hint {
+      position: absolute;
+      bottom: 5%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.95rem;
+      color: rgba(38, 31, 25, 0.7);
+      text-align: center;
+      max-width: 90%;
+    }
+
+    @media (max-width: 620px) {
+      :root { --poly-size: min(78vw, 340px); }
+      .face { width: 160px; height: 160px; margin: -80px; font-size: clamp(1.05rem, 2.5vw, 1.35rem); }
+      .hint { font-size: 0.85rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .polyhedron { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <div class="polyhedron" id="polyhedron"></div>
+    <div class="shadow" aria-hidden="true"></div>
+    <div class="hint">Vezérlés: → előre, ← hátra, ↑ felfelé (vagy gombok / Kinect)</div>
+  </main>
+
+  <script>
+    (() => {
+      const emotions = [
+        { label: 'Öröm', color: 'linear-gradient(155deg, #48c774, #258d4d)' },
+        { label: 'Harag', color: 'linear-gradient(155deg, #f06d5e, #b4372b)' },
+        { label: 'Szomorúság', color: 'linear-gradient(155deg, #67bfd4, #18728b)' },
+        { label: 'Undor', color: 'linear-gradient(155deg, #9cae4e, #67771f)' },
+        { label: 'Félelem', color: 'linear-gradient(155deg, #758df1, #394aad)' },
+        { label: 'Meglepetés', color: 'linear-gradient(155deg, #b184ee, #7445c0)' },
+        { label: 'Közöny', color: 'linear-gradient(155deg, #d2b37a, #97703f)' },
+        { label: 'Bűntudat', color: 'linear-gradient(155deg, #887c76, #524944)' },
+        { label: 'Szégyen', color: 'linear-gradient(155deg, #e08a9e, #a84f65)' },
+        { label: 'Irigység', color: 'linear-gradient(155deg, #73bf8e, #337a4d)' },
+        { label: 'Remény', color: 'linear-gradient(155deg, #ffd36b, #dd9b1b)' },
+        { label: 'Szeretet', color: 'linear-gradient(155deg, #ff8f96, #d74866)' }
+      ];
+
+      const polyhedron = document.getElementById('polyhedron');
+      const goldenRatio = (1 + Math.sqrt(5)) / 2;
+      const vertices = [
+        [0, 1, goldenRatio],
+        [0, -1, goldenRatio],
+        [0, 1, -goldenRatio],
+        [0, -1, -goldenRatio],
+        [1, goldenRatio, 0],
+        [-1, goldenRatio, 0],
+        [1, -goldenRatio, 0],
+        [-1, -goldenRatio, 0],
+        [goldenRatio, 0, 1],
+        [goldenRatio, 0, -1],
+        [-goldenRatio, 0, 1],
+        [-goldenRatio, 0, -1]
+      ];
+
+      const vectorLength = (v) => Math.hypot(v[0], v[1], v[2]);
+      const normalize = (v) => {
+        const len = vectorLength(v);
+        return [v[0] / len, v[1] / len, v[2] / len];
+      };
+
+      const faceData = emotions.map((emotion, index) => {
+        const normal = normalize(vertices[index]);
+        const rotateY = Math.atan2(normal[0], normal[2]) * (180 / Math.PI);
+        const rotateX = -Math.atan2(normal[1], Math.hypot(normal[0], normal[2])) * (180 / Math.PI);
+        return { ...emotion, normal, rotateX, rotateY };
+      });
+
+      faceData.forEach((face) => {
+        const div = document.createElement('div');
+        div.className = 'face';
+        div.textContent = face.label;
+        div.style.background = face.color;
+        div.style.transform = `rotateY(${face.rotateY}deg) rotateX(${face.rotateX}deg) translateZ(var(--translate-z))`;
+        polyhedron.appendChild(div);
+      });
+
+      let rotationX = -10;
+      let rotationY = 24;
+      let rolling = false;
+      let currentIndex = 0;
+      const durationMs = 7500;
+
+      function applyRotation() {
+        polyhedron.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+      }
+
+      function rand(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function chooseIndex(direction) {
+        let nextIndex = currentIndex;
+        while (nextIndex === currentIndex) {
+          if (direction === 'up') {
+            const upwardCandidates = faceData
+              .map((face, index) => ({ index, y: face.normal[1] }))
+              .filter((item) => item.y > 0.15)
+              .sort((a, b) => b.y - a.y);
+            nextIndex = upwardCandidates[rand(0, upwardCandidates.length - 1)].index;
+          } else if (direction === 'left') {
+            const leftCandidates = faceData
+              .map((face, index) => ({ index, x: face.normal[0] }))
+              .filter((item) => item.x < -0.12)
+              .sort((a, b) => a.x - b.x);
+            nextIndex = leftCandidates[rand(0, leftCandidates.length - 1)].index;
+          } else if (direction === 'right') {
+            const rightCandidates = faceData
+              .map((face, index) => ({ index, x: face.normal[0] }))
+              .filter((item) => item.x > 0.12)
+              .sort((a, b) => b.x - a.x);
+            nextIndex = rightCandidates[rand(0, rightCandidates.length - 1)].index;
+          } else {
+            nextIndex = rand(0, faceData.length - 1);
+          }
+        }
+        return nextIndex;
+      }
+
+      function roll(direction = 'right') {
+        if (rolling) return;
+        rolling = true;
+
+        const nextIndex = chooseIndex(direction);
+        const face = faceData[nextIndex];
+
+        // Target orientation: face normal pointing directly at viewer
+        // Negate the face's rotation to bring it to front
+        const targetX = -face.rotateX;
+        const targetY = -face.rotateY;
+
+        const spinsX = direction === 'up' ? rand(4, 6) * 360 : rand(2, 4) * 360;
+        const spinsY = direction === 'left' || direction === 'right' ? rand(4, 6) * 360 : rand(2, 4) * 360;
+
+        // Ensure text stays upright: normalize targetY to nearest 360 multiple
+        const normY = ((targetY % 360) + 360) % 360;
+        const uprightY = normY > 180 ? targetY + (360 - normY) : targetY - normY;
+
+        if (direction === 'left') {
+          rotationX = targetX - spinsY;
+          rotationY = uprightY + spinsY;
+        } else if (direction === 'up') {
+          rotationX = targetX - spinsX;
+          rotationY = uprightY + rand(0, 2) * 180;
+        } else if (direction === 'right') {
+          rotationX = targetX + spinsY;
+          rotationY = uprightY + spinsY;
+        } else {
+          rotationX = targetX + spinsX;
+          rotationY = uprightY + spinsY;
+        }
+
+        currentIndex = nextIndex;
+        applyRotation();
+
+        window.setTimeout(() => {
+          rolling = false;
+        }, durationMs);
+      }
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          roll('right');
+        } else if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          roll('left');
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          roll('up');
+        }
+      });
+
+      window.rollEmotionD12 = roll;
+      applyRotation();
+    })();
+  </script>
+</body>
+</html>

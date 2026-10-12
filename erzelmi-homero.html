@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>Érzelmi Hőmérő</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg-0:#1c1a17;
+    --bg-1:#26221d;
+    --brass:#b8935a;
+    --brass-dim:#7a6440;
+    --glass-hi:rgba(255,255,255,0.10);
+    --cold:#3d7cb8;
+    --cold-2:#6fb3d8;
+    --neutral:#eae4d6;
+    --warm:#d9622f;
+    --warm-2:#f2a341;
+    --paper:#eae4d6;
+    --paper-dim:#a89f8c;
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{
+    height:100%;
+    margin:0;
+    background:
+      radial-gradient(ellipse at 50% -10%, #33302a 0%, transparent 60%),
+      linear-gradient(180deg, var(--bg-1), var(--bg-0) 60%);
+    color:var(--paper);
+    font-family:'IBM Plex Mono', monospace;
+    overflow:hidden;
+  }
+
+  .stage{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:28px;
+    padding:24px;
+    position:relative;
+  }
+
+  .eyebrow{
+    letter-spacing:0.32em;
+    text-transform:uppercase;
+    font-size:11px;
+    color:var(--brass);
+    opacity:0.85;
+  }
+
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:clamp(24px, 4vw, 34px);
+    margin:0;
+    color:var(--paper);
+    letter-spacing:0.01em;
+  }
+
+  .rig{
+    display:flex;
+    align-items:flex-end;
+    gap:56px;
+  }
+
+  /* ---- Thermometer ---- */
+  .thermo-wrap{
+    position:relative;
+    filter:drop-shadow(0 18px 30px rgba(0,0,0,0.55));
+  }
+
+  .thermo-frame{
+    width:150px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .cap{
+    width:34px;
+    height:16px;
+    background:linear-gradient(180deg, #d8b87c, var(--brass-dim));
+    border-radius:6px 6px 3px 3px;
+    box-shadow:inset 0 -2px 3px rgba(0,0,0,0.35);
+  }
+
+  .tube-region{
+    position:relative;
+    width:44px;
+    height:420px;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.16) 30%, rgba(255,255,255,0.02) 55%, rgba(255,255,255,0.05));
+    border:1px solid rgba(255,255,255,0.14);
+    border-radius:22px;
+    overflow:hidden;
+    box-shadow:
+      inset 3px 0 6px rgba(255,255,255,0.06),
+      inset -6px 0 12px rgba(0,0,0,0.5);
+  }
+
+  .ticks{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:14px 0;
+    pointer-events:none;
+  }
+  .tick{
+    display:flex;
+    align-items:center;
+    width:100%;
+  }
+  .tick .line{
+    width:10px;
+    height:1px;
+    background:rgba(255,255,255,0.28);
+    margin-left:4px;
+  }
+  .tick.major .line{ width:16px; background:rgba(255,255,255,0.5);}
+  .tick .num{
+    font-size:9px;
+    color:var(--paper-dim);
+    margin-left:6px;
+    letter-spacing:0.02em;
+  }
+
+  .mercury{
+    position:absolute;
+    left:6px;
+    right:6px;
+    bottom:60px; /* sits above the bulb */
+    height:0%;
+    border-radius:6px;
+    background:linear-gradient(180deg, var(--warm-2), var(--warm));
+    transition:height 60ms linear, background 300ms ease;
+    box-shadow:0 0 14px 2px rgba(217,98,47,0.35);
+  }
+  .mercury::after{
+    content:'';
+    position:absolute;
+    top:-5px; left:0; right:0; height:10px;
+    border-radius:50%;
+    background:inherit;
+    filter:brightness(1.12);
+  }
+
+  .bulb{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:64px;
+    margin:0 -8px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--warm-2), var(--warm) 60%, #a83f1c 100%);
+    box-shadow:0 0 24px 4px rgba(217,98,47,0.45), inset -6px -6px 10px rgba(0,0,0,0.35);
+    z-index:2;
+    transition:background 300ms ease, box-shadow 300ms ease;
+  }
+
+  .zero-mark{
+    position:absolute;
+    left:-14px;
+    right:-14px;
+    height:1px;
+    background:repeating-linear-gradient(90deg, var(--brass) 0 5px, transparent 5px 9px);
+    opacity:0.75;
+  }
+
+  /* ---- Readout ---- */
+  .readout{
+    width:230px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .value-card{
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px;
+    padding:18px 20px;
+  }
+
+  .degree{
+    font-family:'Fraunces', serif;
+    font-size:44px;
+    font-weight:600;
+    line-height:1;
+    color:var(--paper);
+    display:flex;
+    align-items:baseline;
+    gap:4px;
+  }
+  .degree span.unit{
+    font-size:18px;
+    color:var(--paper-dim);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .emotion-label{
+    margin-top:10px;
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-weight:600;
+    letter-spacing:0.01em;
+    transition:color 300ms ease;
+  }
+
+  .emotion-sub{
+    font-size:11px;
+    color:var(--paper-dim);
+    margin-top:4px;
+    letter-spacing:0.03em;
+  }
+
+  /* ---- Gesture indicator ---- */
+  .gesture{
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px;
+    padding:16px 20px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+
+  .hand-ring{
+    position:relative;
+    width:46px;
+    height:46px;
+    flex:none;
+  }
+  .hand-ring svg{
+    position:absolute;
+    inset:0;
+    transform:rotate(-90deg);
+  }
+  .hand-ring circle.bg{
+    fill:none;
+    stroke:rgba(255,255,255,0.1);
+    stroke-width:3;
+  }
+  .hand-ring circle.fg{
+    fill:none;
+    stroke:var(--brass);
+    stroke-width:3;
+    stroke-linecap:round;
+    stroke-dasharray:126;
+    stroke-dashoffset:126;
+    transition:stroke-dashoffset 60ms linear, stroke 200ms ease;
+  }
+  .hand-icon{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
+    transition:transform 150ms ease;
+  }
+
+  .gesture-text{
+    font-size:11.5px;
+    line-height:1.5;
+    color:var(--paper-dim);
+  }
+  .gesture-text b{
+    color:var(--paper);
+    font-weight:500;
+  }
+
+  .hint{
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:10.5px;
+    color:var(--paper-dim);
+    letter-spacing:0.05em;
+    display:flex;
+    gap:18px;
+    opacity:0.75;
+  }
+  .hint kbd{
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:4px;
+    padding:1px 6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+  }
+
+  @media (max-width:560px){
+    .rig{ flex-direction:column; align-items:center; gap:24px; }
+    .readout{ width:260px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .mercury{ transition:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="eyebrow">Kinect gesztusérzékelés · szimuláció</div>
+  <h1>Érzelmi Hőmérő</h1>
+
+  <div class="rig">
+    <div class="thermo-wrap">
+      <div class="thermo-frame">
+        <div class="cap"></div>
+        <div class="tube-region" id="tubeRegion">
+          <div class="ticks" id="ticks"></div>
+          <div class="zero-mark" id="zeroMark"></div>
+          <div class="mercury" id="mercury"></div>
+          <div class="bulb" id="bulb"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div class="value-card">
+        <div class="degree"><span id="degVal">0</span><span class="unit">°É</span></div>
+        <div class="emotion-label" id="emoLabel">Semleges</div>
+        <div class="emotion-sub" id="emoSub">A kéz nyugalmi helyzetben</div>
+      </div>
+
+      <div class="gesture">
+        <div class="hand-ring">
+          <svg viewBox="0 0 46 46">
+            <circle class="bg" cx="23" cy="23" r="20"></circle>
+            <circle class="fg" id="ringFg" cx="23" cy="23" r="20"></circle>
+          </svg>
+          <div class="hand-icon" id="handIcon">✋</div>
+        </div>
+        <div class="gesture-text">
+          <div>Irány: <b id="dirText">—</b></div>
+          <div>Tartás: <b id="holdText">0.0 mp</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">
+    <span><kbd>←</kbd> hidegebb / szomorúbb</span>
+    <span><kbd>→</kbd> melegebb / vidámabb</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MIN = -50, MAX = 50;
+  const NEUTRAL_BAND = 3;
+
+  let value = 0;
+  let direction = 0;       // -1, 0, 1
+  let holdSeconds = 0;
+  let lastTime = null;
+  let keyLeftDown = false, keyRightDown = false;
+
+  const mercuryEl = document.getElementById('mercury');
+  const bulbEl = document.getElementById('bulb');
+  const zeroMarkEl = document.getElementById('zeroMark');
+  const degValEl = document.getElementById('degVal');
+  const emoLabelEl = document.getElementById('emoLabel');
+  const emoSubEl = document.getElementById('emoSub');
+  const dirTextEl = document.getElementById('dirText');
+  const holdTextEl = document.getElementById('holdText');
+  const handIconEl = document.getElementById('handIcon');
+  const ringFg = document.getElementById('ringFg');
+  const ticksEl = document.getElementById('ticks');
+
+  // Build tick scale (from MAX down to MIN, step 10, minor every 5)
+  const ticksFrag = document.createDocumentFragment();
+  for(let v = MAX; v >= MIN; v -= 5){
+    const isMajor = (v % 10 === 0);
+    const row = document.createElement('div');
+    row.className = 'tick' + (isMajor ? ' major' : '');
+    const line = document.createElement('div');
+    line.className = 'line';
+    row.appendChild(line);
+    if(isMajor){
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = v;
+      row.appendChild(num);
+    }
+    ticksFrag.appendChild(row);
+  }
+  ticksEl.appendChild(ticksFrag);
+  // position the zero divider precisely
+  const zeroFrac = (MAX - 0) / (MAX - MIN);
+  zeroMarkEl.style.top = (zeroFrac * 100) + '%';
+
+  function colorForValue(v){
+    // -50..0 : cold -> neutral,  0..50 : neutral -> warm
+    if(v <= 0){
+      const t = Math.min(1, -v / 50);
+      return mix('#eae4d6', '#3d7cb8', t, '#6fb3d8', t);
+    } else {
+      const t = Math.min(1, v / 50);
+      return mix('#eae4d6', '#d9622f', t, '#f2a341', t);
+    }
+  }
+  function mix(c0, c1, t, cTop, tTop){
+    // simple two-stop gradient string for background
+    return `linear-gradient(180deg, ${lerpColor(c0,cTop,t)}, ${lerpColor(c0,c1,t)})`;
+  }
+  function lerpColor(a,b,t){
+    const ca = hexToRgb(a), cb = hexToRgb(b);
+    const r = Math.round(ca.r + (cb.r-ca.r)*t);
+    const g = Math.round(ca.g + (cb.g-ca.g)*t);
+    const bch = Math.round(ca.b + (cb.b-ca.b)*t);
+    return `rgb(${r},${g},${bch})`;
+  }
+  function hexToRgb(hex){
+    const h = hex.replace('#','');
+    return {
+      r: parseInt(h.substring(0,2),16),
+      g: parseInt(h.substring(2,4),16),
+      b: parseInt(h.substring(4,6),16)
+    };
+  }
+
+  function emotionFor(v){
+    if(Math.abs(v) <= NEUTRAL_BAND) return {label:'Semleges', sub:'A kéz nyugalmi helyzetben', glow:'rgba(234,228,214,0.25)'};
+    if(v > NEUTRAL_BAND && v <= 15) return {label:'Nyugodtan derűs', sub:'Enyhén jobbra nyújtott kéz', glow:'rgba(242,163,65,0.3)'};
+    if(v > 15 && v <= 32) return {label:'Vidám', sub:'Határozottan jobbra nyújtott kéz', glow:'rgba(217,98,47,0.4)'};
+    if(v > 32) return {label:'Lelkes / Izgatott', sub:'Teljesen kinyújtott jobb kéz', glow:'rgba(217,98,47,0.55)'};
+    if(v < -NEUTRAL_BAND && v >= -15) return {label:'Csendes', sub:'Enyhén balra nyújtott kéz', glow:'rgba(111,179,216,0.3)'};
+    if(v < -15 && v >= -32) return {label:'Szomorkás', sub:'Határozottan balra nyújtott kéz', glow:'rgba(61,124,184,0.4)'};
+    return {label:'Levert / Fagyos', sub:'Teljesen kinyújtott bal kéz', glow:'rgba(61,124,184,0.55)'};
+  }
+
+  function render(){
+    const frac = (value - MIN) / (MAX - MIN);      // 0..1 across full range
+    const heightPct = frac * 100;
+    mercuryEl.style.height = heightPct + '%';
+
+    const grad = colorForValue(value);
+    mercuryEl.style.background = grad;
+    bulbEl.style.background =
+      value <= 0
+        ? `radial-gradient(circle at 35% 30%, ${lerpColor('#eae4d6','#6fb3d8', Math.min(1,-value/50))}, ${lerpColor('#eae4d6','#3d7cb8', Math.min(1,-value/50))} 60%, #1f4a6b 100%)`
+        : `radial-gradient(circle at 35% 30%, ${lerpColor('#eae4d6','#f2a341', Math.min(1,value/50))}, ${lerpColor('#eae4d6','#d9622f', Math.min(1,value/50))} 60%, #a83f1c 100%)`;
+
+    degValEl.textContent = Math.round(value);
+    const emo = emotionFor(value);
+    emoLabelEl.textContent = emo.label;
+    emoSubEl.textContent = emo.sub;
+    emoLabelEl.style.color = value === 0 ? 'var(--paper)' : (value > 0 ? 'var(--warm-2)' : 'var(--cold-2)');
+    mercuryEl.style.boxShadow = `0 0 16px 3px ${emo.glow}`;
+
+    dirTextEl.textContent = direction === 1 ? 'Jobbra (melegítés)' : direction === -1 ? 'Balra (hűtés)' : '—';
+    holdTextEl.textContent = holdSeconds.toFixed(1) + ' mp';
+
+    handIconEl.textContent = direction === 1 ? '👉' : direction === -1 ? '👈' : '✋';
+    handIconEl.style.transform = direction !== 0 ? 'scale(1.15)' : 'scale(1)';
+
+    const ringMax = 3.0; // seconds to fill ring
+    const ringFrac = Math.min(1, holdSeconds / ringMax);
+    const dash = 126 * (1 - ringFrac);
+    ringFg.style.strokeDashoffset = dash;
+    ringFg.style.stroke = direction === 1 ? 'var(--warm-2)' : direction === -1 ? 'var(--cold-2)' : 'var(--brass)';
+  }
+
+  function step(ts){
+    if(lastTime === null) lastTime = ts;
+    const dt = (ts - lastTime) / 1000;
+    lastTime = ts;
+
+    if(direction !== 0){
+      holdSeconds += dt;
+      // időarányos gyorsulás: minél tovább tartja, annál gyorsabban változik
+      const baseSpeed = 6;          // fok / mp minimum
+      const accel = 10;             // fok / mp^2 (max sebesség plafonig)
+      const speed = Math.min(baseSpeed + accel * holdSeconds, 40);
+      value += direction * speed * dt;
+      value = Math.max(MIN, Math.min(MAX, value));
+    } else {
+      holdSeconds = 0;
+    }
+
+    render();
+    requestAnimationFrame(step);
+  }
+
+  function updateDirection(){
+    if(keyRightDown && !keyLeftDown) direction = 1;
+    else if(keyLeftDown && !keyRightDown) direction = -1;
+    else direction = 0;
+    if(direction === 0) holdSeconds = 0;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowRight'){ keyRightDown = true; updateDirection(); e.preventDefault(); }
+    if(e.key === 'ArrowLeft'){ keyLeftDown = true; updateDirection(); e.preventDefault(); }
+  });
+  window.addEventListener('keyup', (e) => {
+    if(e.key === 'ArrowRight'){ keyRightDown = false; updateDirection(); }
+    if(e.key === 'ArrowLeft'){ keyLeftDown = false; updateDirection(); }
+  });
+  window.addEventListener('blur', () => {
+    keyLeftDown = false; keyRightDown = false; updateDirection();
+  });
+
+  render();
+  requestAnimationFrame(step);
+})();
+</script>
+
+</body>
+</html>
