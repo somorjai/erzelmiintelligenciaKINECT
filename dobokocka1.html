@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Érzelem dobókocka</title>
+
   <style>
     :root {
       --bg: #f5f1eb;
@@ -14,6 +15,7 @@
 
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; overflow: hidden; }
+
     body {
       display: grid;
       place-items: center;
@@ -79,6 +81,27 @@
       filter: blur(6px);
     }
 
+    .kinect-status {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 10;
+      padding: 9px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.88);
+      color: #444;
+      font-size: 13px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .kinect-status.connected {
+      color: #146b3a;
+    }
+
+    .kinect-status.error {
+      color: #a4262c;
+    }
+
     @media (max-width: 520px) {
       :root { --cube-size: min(74vw, 270px); }
       .shadow { width: min(56vw, 210px); }
@@ -89,6 +112,7 @@
     }
   </style>
 </head>
+
 <body>
   <main class="scene" aria-label="Érzelem dobókocka">
     <div class="cube-wrap">
@@ -100,13 +124,20 @@
         <div class="face top">Közöny</div>
         <div class="face bottom">Meglepetés</div>
       </div>
+
       <div class="shadow" aria-hidden="true"></div>
     </div>
   </main>
 
+  <div class="kinect-status" id="kinectStatus">
+    Kinect-híd: nincs kapcsolat
+  </div>
+
   <script>
     (() => {
       const cube = document.getElementById('cube');
+      const statusBox = document.getElementById('kinectStatus');
+
       const faces = [
         { x: 0, y: 0 },
         { x: 0, y: 180 },
@@ -125,11 +156,13 @@
       }
 
       function applyRotation() {
-        cube.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+        cube.style.transform =
+          `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
       }
 
       function roll(direction = 'right') {
         if (rolling) return;
+
         rolling = true;
 
         const face = faces[Math.floor(Math.random() * faces.length)];
@@ -151,19 +184,91 @@
         }, 8500);
       }
 
+      /*
+        Megmarad a billentyűzetes vezérlés.
+      */
       window.addEventListener('keydown', (event) => {
         if (event.key === 'ArrowRight') {
           event.preventDefault();
           roll('right');
         }
+
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
           roll('left');
         }
       });
 
+      function setKinectStatus(text, state) {
+        statusBox.textContent = text;
+        statusBox.className = 'kinect-status';
+
+        if (state) {
+          statusBox.classList.add(state);
+        }
+      }
+
+      /*
+        A helyben futó Kinect-hídprogram WebSocket címe.
+        A hídprogram "left" vagy "right" szöveget küld.
+      */
+      const KINECT_BRIDGE_URL = 'ws://localhost:8182/';
+
+      let bridgeSocket = null;
+
+      function connectKinectBridge() {
+        try {
+          bridgeSocket = new WebSocket(KINECT_BRIDGE_URL);
+
+          bridgeSocket.addEventListener('open', () => {
+            setKinectStatus(
+              'Kinect-híd: kapcsolódva. Bal kéz = balra, jobb kéz = jobbra.',
+              'connected'
+            );
+          });
+
+          bridgeSocket.addEventListener('message', (event) => {
+            const command = String(event.data).trim().toLowerCase();
+
+            if (command === 'left') {
+              roll('left');
+            }
+
+            if (command === 'right') {
+              roll('right');
+            }
+          });
+
+          bridgeSocket.addEventListener('close', () => {
+            setKinectStatus(
+              'Kinect-híd: kapcsolat megszakadt; újracsatlakozás…',
+              'error'
+            );
+
+            window.setTimeout(connectKinectBridge, 3000);
+          });
+
+          bridgeSocket.addEventListener('error', () => {
+            setKinectStatus(
+              'Kinect-híd: nem érhető el a ws://localhost:8182 címen.',
+              'error'
+            );
+          });
+
+        } catch (error) {
+          setKinectStatus(
+            'Kinect-híd: WebSocket hiba.',
+            'error'
+          );
+
+          window.setTimeout(connectKinectBridge, 3000);
+        }
+      }
+
       window.rollEmotionDice = roll;
+
       applyRotation();
+      connectKinectBridge();
     })();
   </script>
 </body>
